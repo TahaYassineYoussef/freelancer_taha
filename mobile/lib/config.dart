@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart';
 /// firewall. (`adb reverse` did not route on the test A50, so the tunnel isn't
 /// relied on.) The emulator reaches this LAN IP fine too. In production this is
 /// simply your domain.
-const _androidHost = '192.168.0.230';
+const _androidHost = '127.0.0.1';
 
 String get apiBaseUrl {
   if (kIsWeb) return 'http://127.0.0.1:8000/api';

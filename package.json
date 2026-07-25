@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "deploy": "powershell -ExecutionPolicy Bypass -File deploy.ps1 preview",
+        "deploy:prod": "powershell -ExecutionPolicy Bypass -File deploy.ps1 prod"
     },
     "devDependencies": {
         "@headlessui/react": "^2.0.0",

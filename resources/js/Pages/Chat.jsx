@@ -100,7 +100,8 @@ export default function Chat({ partners, selectedPartner, messages: initialMessa
     const [partnerTyping, setPartnerTyping] = useState(false);
     const [error, setError] = useState('');
 
-    const bottomRef = useRef(null);
+    const listRef = useRef(null);
+    const prevPartnerRef = useRef(selectedPartner?.id);
     const fileRef = useRef(null);
     const typingClear = useRef(null);
     const lastTypingSent = useRef(0);
@@ -138,10 +139,19 @@ export default function Chat({ partners, selectedPartner, messages: initialMessa
         return () => clearInterval(id);
     }, [selectedPartner?.id]);
 
-    // Auto-scroll to the newest message / typing bubble.
+    // Auto-scroll the message list — and ONLY the list, never the window — to the
+    // newest message. scrollIntoView() used to scroll the whole page down on every
+    // 1.2s poll, pushing the call buttons out of reach. Set the container's
+    // scrollTop instead, and only when switching conversations or already near the
+    // bottom, so scrolling up to read history isn't yanked back down.
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, partnerTyping]);
+        const el = listRef.current;
+        if (!el) return;
+        const switched = prevPartnerRef.current !== selectedPartner?.id;
+        prevPartnerRef.current = selectedPartner?.id;
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 140;
+        if (switched || nearBottom) el.scrollTop = el.scrollHeight;
+    }, [messages, partnerTyping, selectedPartner?.id]);
 
     const pingTyping = () => {
         if (!selectedPartner) return;
@@ -246,7 +256,7 @@ export default function Chat({ partners, selectedPartner, messages: initialMessa
                                 <CallButtons partner={selectedPartner} />
                             </div>
 
-                            <div className="flex-1 space-y-1.5 overflow-y-auto px-5 py-4">
+                            <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto px-5 py-4">
                                 {messages.length === 0 && <p className="mt-10 text-center text-sm text-gray-500">{t('No messages yet. Say hello 👋')}</p>}
                                 {messages.map((m, i) => {
                                     if (m.call_status) return <CallCard key={m.id} m={m} />;
@@ -277,7 +287,6 @@ export default function Chat({ partners, selectedPartner, messages: initialMessa
                                         </div>
                                     </div>
                                 )}
-                                <div ref={bottomRef} />
                             </div>
 
                             {/* Selected-file preview + errors */}

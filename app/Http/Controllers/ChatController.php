@@ -97,11 +97,31 @@ class ChatController extends Controller
         $me = $request->user();
         $this->assertCanChat($me, $user);
 
-        $data = $request->validate([
+        // Validate manually and return JSON on failure. This route is a *web*
+        // route hit via axios (not api/*), and the app only auto-renders
+        // validation exceptions as JSON for api/* paths — so a thrown
+        // ValidationException would redirect instead of giving the front-end a
+        // readable error. Returning JSON here keeps the error visible in chat.
+        //
+        // We validate the attachment by its extension rather than its sniffed
+        // MIME type: Windows/WAMP PHP frequently reports a .docx/.xlsx as
+        // application/zip (or octet-stream), which makes the `mimes` rule
+        // wrongly reject Word and Office documents. `extensions` checks the
+        // real extension instead, so PDF and Word files always go through.
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'body' => ['nullable', 'string', 'max:2000'],
             'attachment' => ['nullable', 'file', 'max:25600', // 25 MB
-                'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar,mp3,mp4,mov'],
+                'extensions:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar,mp3,mp4,mov'],
+        ], [
+            'attachment.extensions' => 'That file type is not allowed. You can send images, PDF, Word, Excel, PowerPoint, text, or archive files.',
+            'attachment.max' => 'That file is too big (max 25 MB).',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $data = $validator->validated();
 
         if (blank($data['body'] ?? null) && ! $request->hasFile('attachment')) {
             return response()->json(['message' => 'Type a message or attach a file.'], 422);

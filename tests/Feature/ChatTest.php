@@ -56,6 +56,36 @@ class ChatTest extends TestCase
         Storage::disk('public')->assertExists($message->attachment_path);
     }
 
+    public function test_client_can_send_pdf_and_word_documents(): void
+    {
+        Storage::fake('public');
+        $freelancer = $this->freelancer();
+        $client = $this->client();
+
+        foreach (['contract.pdf', 'brief.docx', 'notes.doc'] as $name) {
+            $this->actingAs($client)
+                ->post(route('chat.store', $freelancer->id), [
+                    'attachment' => UploadedFile::fake()->create($name, 200),
+                ])
+                ->assertOk();
+        }
+
+        $this->assertSame(3, \App\Models\Message::whereNotNull('attachment_path')->count());
+    }
+
+    public function test_disallowed_file_type_is_rejected(): void
+    {
+        Storage::fake('public');
+        $freelancer = $this->freelancer();
+        $client = $this->client();
+
+        $this->actingAs($client)
+            ->post(route('chat.store', $freelancer->id), [
+                'attachment' => UploadedFile::fake()->create('malware.exe', 100),
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+    }
+
     public function test_empty_message_with_no_attachment_is_rejected(): void
     {
         $freelancer = $this->freelancer();

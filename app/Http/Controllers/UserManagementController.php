@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -104,7 +105,7 @@ class UserManagementController extends Controller
      * that look like OnlyFans/adult spam, scams, or bots for the admin to review
      * and delete. Never deletes automatically.
      */
-    public function scan(Request $request): Response
+    public function scan(Request $request): JsonResponse
     {
         $candidates = User::where('role', '!=', 'freelancer')
             ->latest()
@@ -134,9 +135,12 @@ class UserManagementController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('ManageUsers', $this->baseProps($request) + [
+        // Return JSON (not an Inertia page) so the scan never changes the URL —
+        // otherwise the dashboard's periodic reload would re-GET /users/scan and
+        // 405, since this endpoint is POST-only.
+        return response()->json([
             'flagged' => $flagged,
-            'scanVia' => \App\Support\AiUserScreener::aiEnabled() ? 'ai' : 'heuristic',
+            'via' => \App\Support\AiUserScreener::aiEnabled() ? 'ai' : 'heuristic',
         ]);
     }
 

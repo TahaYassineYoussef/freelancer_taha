@@ -147,13 +147,12 @@ class UserManagementTest extends TestCase
         ]);
 
         $this->actingAs($freelancer)
-            ->post(route('users.scan'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('ManageUsers')
-                ->where('scanVia', 'heuristic')
-                ->has('flagged', 1)
-                ->where('flagged.0.id', $spam->id)
-                ->where('flagged.0.risk', 'high'));
+            ->postJson(route('users.scan'))
+            ->assertOk()
+            ->assertJsonPath('via', 'heuristic')
+            ->assertJsonCount(1, 'flagged')
+            ->assertJsonPath('flagged.0.id', $spam->id)
+            ->assertJsonPath('flagged.0.risk', 'high');
     }
 
     public function test_search_filters_the_list(): void

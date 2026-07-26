@@ -1,7 +1,7 @@
 import PanelLayout from '@/Layouts/PanelLayout';
 import LineChart from '@/Components/LineChart';
 import { useT } from '@/i18n';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 // Registrations are bucketed by day / month / year on the server.
@@ -84,7 +84,7 @@ function Pagination({ meta }) {
     );
 }
 
-export default function ManageUsers({ stats, chart, users, filters, flagged, scanVia }) {
+export default function ManageUsers({ stats, chart, users, filters }) {
     const t = useT();
     const [search, setSearch] = useState(filters.search || '');
     const [sentIds, setSentIds] = useState(() => new Set());
@@ -92,28 +92,25 @@ export default function ManageUsers({ stats, chart, users, filters, flagged, sca
     const [deletingId, setDeletingId] = useState(null);
     const [notice, setNotice] = useState(null);
     const [scanning, setScanning] = useState(false);
-    const [flaggedList, setFlaggedList] = useState(flagged || []);
-    const [scanned, setScanned] = useState(flagged !== undefined);
-    const [via, setVia] = useState(scanVia || null);
+    const [flaggedList, setFlaggedList] = useState([]);
+    const [scanned, setScanned] = useState(false);
+    const [via, setVia] = useState(null);
     const firstRun = useRef(true);
 
-    // A scan re-renders this page with a fresh `flagged` prop; mirror it into
-    // local state so we can prune rows as they're deleted without re-scanning.
-    useEffect(() => {
-        if (flagged !== undefined) {
-            setFlaggedList(flagged);
-            setScanned(true);
-            setVia(scanVia || null);
-        }
-    }, [flagged, scanVia]);
-
+    // The scan is a plain JSON call (like chat/calls) so it never changes the
+    // URL — an Inertia POST that renders would leave the URL on /users/scan and
+    // the dashboard's periodic reload would then 405 on it.
     const runScan = () => {
         setScanning(true);
-        router.post(route('users.scan'), {}, {
-            preserveScroll: true,
-            preserveState: true,
-            onFinish: () => setScanning(false),
-        });
+        window.axios
+            .post(route('users.scan'))
+            .then((res) => {
+                setFlaggedList(res.data.flagged || []);
+                setVia(res.data.via || null);
+                setScanned(true);
+            })
+            .catch(() => setNotice({ type: 'error', text: t('Scan failed. Try again.') }))
+            .finally(() => setScanning(false));
     };
 
     const flashFrom = (page) => {

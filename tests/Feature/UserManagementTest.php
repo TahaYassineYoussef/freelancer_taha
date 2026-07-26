@@ -83,6 +83,79 @@ class UserManagementTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_freelancer_can_delete_a_client(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        $client = User::factory()->create(['role' => 'client']);
+
+        $this->actingAs($freelancer)
+            ->delete(route('users.destroy', $client))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('users', ['id' => $client->id]);
+    }
+
+    public function test_freelancer_account_cannot_be_deleted(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        $other = User::factory()->create(['role' => 'freelancer']);
+
+        $this->actingAs($freelancer)
+            ->delete(route('users.destroy', $other))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('users', ['id' => $other->id]);
+    }
+
+    public function test_client_cannot_delete_users(): void
+    {
+        $client = User::factory()->create(['role' => 'client']);
+        $target = User::factory()->create(['role' => 'client']);
+
+        $this->actingAs($client)
+            ->delete(route('users.destroy', $target))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => $target->id]);
+    }
+
+    public function test_bulk_delete_removes_clients_but_never_the_freelancer(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        $c1 = User::factory()->create(['role' => 'client']);
+        $c2 = User::factory()->create(['role' => 'client']);
+
+        $this->actingAs($freelancer)
+            ->post(route('users.bulkDestroy'), ['ids' => [$c1->id, $c2->id, $freelancer->id]])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('users', ['id' => $c1->id]);
+        $this->assertDatabaseMissing('users', ['id' => $c2->id]);
+        $this->assertDatabaseHas('users', ['id' => $freelancer->id]);
+    }
+
+    public function test_scan_flags_onlyfans_spam_and_spares_real_clients(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        User::factory()->create([
+            'role' => 'client', 'name' => 'John Doe', 'email' => 'john@example.com',
+            'bio' => 'Looking for a web developer to build my bakery site.',
+        ]);
+        $spam = User::factory()->create([
+            'role' => 'client', 'name' => 'Hot Girl', 'email' => 'x@example.com',
+            'bio' => 'check out my onlyfans, link in bio',
+        ]);
+
+        $this->actingAs($freelancer)
+            ->post(route('users.scan'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ManageUsers')
+                ->where('scanVia', 'heuristic')
+                ->has('flagged', 1)
+                ->where('flagged.0.id', $spam->id)
+                ->where('flagged.0.risk', 'high'));
+    }
+
     public function test_search_filters_the_list(): void
     {
         $freelancer = User::factory()->create(['role' => 'freelancer']);

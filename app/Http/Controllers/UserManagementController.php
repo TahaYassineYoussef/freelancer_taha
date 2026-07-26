@@ -18,6 +18,15 @@ class UserManagementController extends Controller
 {
     public function index(Request $request): Response
     {
+        return Inertia::render('ManageUsers', $this->baseProps($request));
+    }
+
+    /**
+     * Stats, chart, filters and the paginated list — shared by index() and
+     * scan() (which adds a `flagged` prop on top).
+     */
+    private function baseProps(Request $request): array
+    {
         $filters = [
             'search' => trim((string) $request->query('search')) ?: null,
             'role' => in_array($request->query('role'), ['client', 'freelancer'], true)
@@ -46,11 +55,88 @@ class UserManagementController extends Controller
                 'joined_human' => $u->created_at?->diffForHumans(),
             ]);
 
-        return Inertia::render('ManageUsers', [
+        return [
             'stats' => $this->stats(),
             'chart' => $this->registrationSeries(),
             'users' => $users,
             'filters' => $filters,
+        ];
+    }
+
+    /**
+     * Permanently delete one account. Freelancer accounts are protected (there
+     * is exactly one, seeded, and it must never be removable from here).
+     */
+    public function destroy(User $user): RedirectResponse
+    {
+        if ($user->isFreelancer()) {
+            return back()->with('error', 'Freelancer accounts cannot be deleted here.');
+        }
+
+        $name = $user->name;
+        $user->delete(); // cascades to their tasks, messages, payments, etc.
+
+        return back()->with('success', "Deleted {$name}.");
+    }
+
+    /**
+     * Delete several client accounts at once (used by "Delete all flagged").
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'max:200'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $deleted = User::whereIn('id', $data['ids'])
+            ->where('role', '!=', 'freelancer') // never delete the freelancer
+            ->get()
+            ->each
+            ->delete()
+            ->count();
+
+        return back()->with('success', "Deleted {$deleted} account(s).");
+    }
+
+    /**
+     * Run the AI/heuristic screener over client accounts and return the ones
+     * that look like OnlyFans/adult spam, scams, or bots for the admin to review
+     * and delete. Never deletes automatically.
+     */
+    public function scan(Request $request): Response
+    {
+        $candidates = User::where('role', '!=', 'freelancer')
+            ->latest()
+            ->limit(200) // bound the batch so one AI call stays fast
+            ->get(['id', 'name', 'email', 'headline', 'bio']);
+
+        $verdicts = collect(\App\Support\AiUserScreener::scan($candidates->map(fn (User $u) => [
+            'id' => $u->id,
+            'name' => $u->name,
+            'email' => $u->email,
+            'headline' => $u->headline,
+            'bio' => $u->bio,
+        ])->all()))->keyBy('id');
+
+        $byId = $candidates->keyBy('id');
+        $order = ['high' => 0, 'medium' => 1, 'low' => 2];
+
+        $flagged = $verdicts
+            ->map(fn ($v) => [
+                'id' => $v['id'],
+                'name' => $byId[$v['id']]->name ?? '',
+                'email' => $byId[$v['id']]->email ?? '',
+                'risk' => $v['risk'],
+                'reason' => $v['reason'],
+            ])
+            ->sortBy(fn ($f) => $order[$f['risk']] ?? 3)
+            ->values()
+            ->all();
+
+        return Inertia::render('ManageUsers', $this->baseProps($request) + [
+            'flagged' => $flagged,
+            'scanVia' => \App\Support\AiUserScreener::aiEnabled() ? 'ai' : 'heuristic',
         ]);
     }
 

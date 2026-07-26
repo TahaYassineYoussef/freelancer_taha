@@ -157,8 +157,11 @@ Route::middleware('auth')->group(function () {
 
         // Registered accounts: stats + searchable, paginated user list
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::post('/users/scan', [UserManagementController::class, 'scan'])->name('users.scan');
+        Route::post('/users/bulk-delete', [UserManagementController::class, 'bulkDestroy'])->name('users.bulkDestroy');
         Route::post('/users/{user}/send-verification', [UserManagementController::class, 'sendVerification'])
             ->name('users.sendVerification');
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
 
         // Filterable board of all tasks
         Route::get('/tasks-board', [TaskBoardController::class, 'index'])->name('tasks.index');

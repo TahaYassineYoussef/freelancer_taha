@@ -29,6 +29,19 @@ function RoleBadge({ role }) {
     );
 }
 
+function RiskBadge({ risk }) {
+    const map = {
+        high: 'bg-red-500/15 text-red-300',
+        medium: 'bg-orange-500/15 text-orange-300',
+        low: 'bg-white/10 text-gray-300',
+    };
+    return (
+        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${map[risk] || map.low}`}>
+            {risk}
+        </span>
+    );
+}
+
 // Laravel paginator labels arrive as HTML ("&laquo; Previous", "…"); clean them.
 function decodeLabel(label) {
     return label
@@ -71,13 +84,68 @@ function Pagination({ meta }) {
     );
 }
 
-export default function ManageUsers({ stats, chart, users, filters }) {
+export default function ManageUsers({ stats, chart, users, filters, flagged, scanVia }) {
     const t = useT();
     const [search, setSearch] = useState(filters.search || '');
     const [sentIds, setSentIds] = useState(() => new Set());
     const [sendingId, setSendingId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
     const [notice, setNotice] = useState(null);
+    const [scanning, setScanning] = useState(false);
+    const [flaggedList, setFlaggedList] = useState(flagged || []);
+    const [scanned, setScanned] = useState(flagged !== undefined);
+    const [via, setVia] = useState(scanVia || null);
     const firstRun = useRef(true);
+
+    // A scan re-renders this page with a fresh `flagged` prop; mirror it into
+    // local state so we can prune rows as they're deleted without re-scanning.
+    useEffect(() => {
+        if (flagged !== undefined) {
+            setFlaggedList(flagged);
+            setScanned(true);
+            setVia(scanVia || null);
+        }
+    }, [flagged, scanVia]);
+
+    const runScan = () => {
+        setScanning(true);
+        router.post(route('users.scan'), {}, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setScanning(false),
+        });
+    };
+
+    const flashFrom = (page) => {
+        const flash = page.props.flash || {};
+        if (flash.success) setNotice({ type: 'success', text: flash.success });
+        else if (flash.error) setNotice({ type: 'error', text: flash.error });
+    };
+
+    const deleteUser = (u) => {
+        if (!window.confirm(t('Delete this account permanently? Their tasks, messages and data are removed too.'))) return;
+        setDeletingId(u.id);
+        router.delete(route('users.destroy', u.id), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page) => {
+                flashFrom(page);
+                setFlaggedList((list) => list.filter((f) => f.id !== u.id));
+            },
+            onFinish: () => setDeletingId(null),
+        });
+    };
+
+    const deleteAllFlagged = () => {
+        const ids = flaggedList.map((f) => f.id);
+        if (ids.length === 0) return;
+        if (!window.confirm(t('Delete all flagged accounts permanently? This cannot be undone.'))) return;
+        router.post(route('users.bulkDestroy'), { ids }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page) => { flashFrom(page); setFlaggedList([]); },
+        });
+    };
 
     const sendVerification = (u) => {
         setSendingId(u.id);
@@ -161,6 +229,58 @@ export default function ManageUsers({ stats, chart, users, filters }) {
                 />
             </div>
 
+            {/* Scam & bot detection */}
+            <div className="mt-6 rounded-2xl border border-white/5 bg-ink-700 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-white">🛡️ {t('Scam & bot detection')}</h2>
+                        <p className="text-xs text-gray-400">{t('Scan accounts for OnlyFans spam, scams, and bots. You review before anything is deleted.')}</p>
+                    </div>
+                    <button
+                        onClick={runScan}
+                        disabled={scanning}
+                        className="whitespace-nowrap rounded-full bg-gold px-5 py-2 text-sm font-bold text-ink transition hover:bg-gold-300 disabled:opacity-50"
+                    >
+                        {scanning ? t('Scanning…') : t('Scan now')}
+                    </button>
+                </div>
+
+                {scanned && flaggedList.length === 0 && (
+                    <p className="mt-4 rounded-xl bg-green-500/10 px-4 py-3 text-sm text-green-300">✓ {t('No suspicious accounts found.')}</p>
+                )}
+
+                {flaggedList.length > 0 && (
+                    <div className="mt-4">
+                        <div className="mb-2 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-300">
+                                {flaggedList.length} {t('flagged')}
+                                <span className="ml-1 text-gray-500">· {via === 'ai' ? t('AI review') : t('pattern match')}</span>
+                            </p>
+                            <button onClick={deleteAllFlagged} className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/10">
+                                {t('Delete all flagged')}
+                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            {flaggedList.map((f) => (
+                                <div key={f.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-ink px-4 py-2.5">
+                                    <RiskBadge risk={f.risk} />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-semibold text-white">
+                                            {f.name} <span className="font-normal text-gray-500">· {f.email}</span>
+                                        </p>
+                                        <p className="truncate text-xs text-gray-400">{f.reason}</p>
+                                    </div>
+                                    <button onClick={() => deleteUser(f)} disabled={deletingId === f.id}
+                                        className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50">
+                                        {deletingId === f.id ? '…' : t('Delete')}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* Accounts */}
             <div className="mt-6 rounded-2xl border border-white/5 bg-ink-700">
                 <div className="flex flex-col gap-3 border-b border-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -226,19 +346,30 @@ export default function ManageUsers({ stats, chart, users, filters }) {
                                     </td>
                                     <td className="px-4 py-3 text-gray-400" title={u.joined}>{u.joined_human}</td>
                                     <td className="px-4 py-3">
-                                        {!u.verified && (
-                                            sentIds.has(u.id) ? (
-                                                <span className="text-xs font-semibold text-green-300">✓ {t('Link sent')}</span>
-                                            ) : (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {!u.verified && (
+                                                sentIds.has(u.id) ? (
+                                                    <span className="text-xs font-semibold text-green-300">✓ {t('Link sent')}</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => sendVerification(u)}
+                                                        disabled={sendingId === u.id}
+                                                        className="whitespace-nowrap rounded-full border border-gold/40 px-3 py-1 text-xs font-semibold text-gold transition hover:bg-gold/10 disabled:opacity-50"
+                                                    >
+                                                        {sendingId === u.id ? t('Sending…') : t('Send verification')}
+                                                    </button>
+                                                )
+                                            )}
+                                            {u.role !== 'freelancer' && (
                                                 <button
-                                                    onClick={() => sendVerification(u)}
-                                                    disabled={sendingId === u.id}
-                                                    className="whitespace-nowrap rounded-full border border-gold/40 px-3 py-1 text-xs font-semibold text-gold transition hover:bg-gold/10 disabled:opacity-50"
+                                                    onClick={() => deleteUser(u)}
+                                                    disabled={deletingId === u.id}
+                                                    className="whitespace-nowrap rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
                                                 >
-                                                    {sendingId === u.id ? t('Sending…') : t('Send verification')}
+                                                    {deletingId === u.id ? '…' : t('Delete')}
                                                 </button>
-                                            )
-                                        )}
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

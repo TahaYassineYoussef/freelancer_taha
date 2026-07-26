@@ -72,6 +72,12 @@ class HandleInertiaRequests extends Middleware
                 'enabled' => (bool) ($this->freelancer()?->paypal_enabled ?? config('services.paypal.enabled')),
             ],
             'd17' => fn () => $this->d17Details(),
+            // Public Supabase Realtime config for instant call signalling. Only
+            // shared to signed-in users (guests never place calls).
+            'supabase' => $request->user() ? [
+                'url' => config('services.supabase.url'),
+                'anonKey' => config('services.supabase.anon_key'),
+            ] : null,
             'locale' => app()->getLocale(),
             'dir' => app()->getLocale() === 'ar' ? 'rtl' : 'ltr',
             'translations' => fn () => $this->translations(),

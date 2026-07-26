@@ -1,5 +1,8 @@
 import CallOverlay from '@/Components/CallOverlay';
 import useCall from '@/useCall';
+import { initSupabase } from '@/supabase';
+import { subscribeInbox, sendRealtimeSignal } from '@/callSignal';
+import { usePage } from '@inertiajs/react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 /**
@@ -16,12 +19,21 @@ export function useCallContext() {
 }
 
 export default function CallProvider({ children }) {
+    const { auth, supabase: supabaseCfg } = usePage().props;
+    const meId = auth?.user?.id;
+    const meName = auth?.user?.name;
+
     const peerRef = useRef({ id: null, name: null });
     const [peerName, setPeerName] = useState(null);
 
     const sendSignal = (kind, payload = null) => {
         const to = peerRef.current.id;
         if (!to) return;
+        // Fast path: instant delivery over Supabase Realtime.
+        sendRealtimeSignal(to, { kind, payload, from_id: meId, from_name: meName });
+        // Reliable path: DB-backed signal that also fires the FCM ring for a
+        // closed app and is drained by the poll below (fallback if Realtime is
+        // unavailable on either end).
         window.axios.post(route('calls.signal'), { to_id: to, kind, payload }).catch(() => {});
     };
 
@@ -54,7 +66,18 @@ export default function CallProvider({ children }) {
 
     const active = call.state !== 'idle';
 
-    // Poll for incoming call signals globally (faster during an active call).
+    // Instant path: subscribe to my Realtime inbox for incoming call signals.
+    // Runs alongside the poll below; whichever delivers first wins, duplicates
+    // are ignored. No-op if Supabase config isn't present.
+    useEffect(() => {
+        if (!meId || !supabaseCfg?.url || !supabaseCfg?.anonKey) return;
+        initSupabase(supabaseCfg.url, supabaseCfg.anonKey);
+        const unsubscribe = subscribeInbox(meId, (s) => dispatchRef.current(s));
+        return unsubscribe;
+    }, [meId, supabaseCfg?.url, supabaseCfg?.anonKey]);
+
+    // Fallback path: poll for incoming call signals globally (faster during an
+    // active call). Kept as a safety net even when Realtime is connected.
     useEffect(() => {
         const tick = () => {
             window.axios

@@ -18,6 +18,14 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    // Supabase — used for object storage (S3) and Realtime call signalling.
+    // url + anon_key are public and shared to the front-end for the Realtime
+    // WebSocket so incoming calls ring instantly instead of waiting for a poll.
+    'supabase' => [
+        'url' => env('SUPABASE_URL'),
+        'anon_key' => env('SUPABASE_ANON_KEY'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

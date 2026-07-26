@@ -54,6 +54,34 @@ class AiUserScreener
             && config('services.anthropic.moderation', true);
     }
 
+    /**
+     * If the email is disposable/temporary or on a reserved, non-real domain,
+     * returns a short reason; otherwise null. Shared by the account scan and the
+     * registration RealEmail rule so both agree on what "not a real email" means.
+     */
+    public static function unrealEmailReason(?string $email): ?string
+    {
+        $email = mb_strtolower(trim((string) $email));
+        $domain = str_contains($email, '@') ? substr(strrchr($email, '@'), 1) : '';
+        if ($domain === '') {
+            return null;
+        }
+
+        if (in_array($domain, self::DISPOSABLE_DOMAINS, true)) {
+            return "Disposable/temporary email address ({$domain}).";
+        }
+
+        // Reserved / non-routable domains that can never hold a real mailbox
+        // (RFC 2606 / 6761): *.test, *.example, *.invalid, *.localhost, *.local,
+        // plus the example.com/net/org documentation domains.
+        if (preg_match('/\.(test|example|invalid|localhost|local)$/', $domain)
+            || in_array($domain, ['example.com', 'example.org', 'example.net'], true)) {
+            return "Non-real email domain ({$domain}).";
+        }
+
+        return null;
+    }
+
     // ---- AI (Claude) --------------------------------------------------------
 
     private static function aiScan(array $users): ?array
@@ -198,21 +226,10 @@ class AiUserScreener
         ));
 
         $email = mb_strtolower(trim((string) ($u['email'] ?? '')));
-        $domain = str_contains($email, '@') ? substr(strrchr($email, '@'), 1) : '';
 
-        // Disposable / temporary / non-real email — a strong bot/fake signal.
-        if ($domain && in_array($domain, self::DISPOSABLE_DOMAINS, true)) {
-            return ['risk' => 'high', 'reason' => "Disposable/temporary email address ({$domain})."];
-        }
-
-        // Reserved / non-routable domains that can never hold a real mailbox
-        // (RFC 2606 / 6761): *.test, *.example, *.invalid, *.localhost, *.local,
-        // plus the example.com/net/org documentation domains.
-        if ($domain && (
-            preg_match('/\.(test|example|invalid|localhost|local)$/', $domain)
-            || in_array($domain, ['example.com', 'example.org', 'example.net'], true)
-        )) {
-            return ['risk' => 'high', 'reason' => "Non-real email domain ({$domain})."];
+        // Disposable / temporary / reserved non-real email — a strong bot signal.
+        if ($reason = self::unrealEmailReason($email)) {
+            return ['risk' => 'high', 'reason' => $reason];
         }
 
         // Strong signals — almost certainly adult spam / scam.

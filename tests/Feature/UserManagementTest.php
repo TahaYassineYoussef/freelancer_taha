@@ -155,6 +155,24 @@ class UserManagementTest extends TestCase
             ->assertJsonPath('flagged.0.risk', 'high');
     }
 
+    public function test_scan_flags_inappropriate_display_names(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        User::factory()->create([
+            'role' => 'client', 'name' => 'Sarah Client', 'email' => 'sarah@gmail.com', 'bio' => 'Need a website.',
+        ]);
+        $bad = User::factory()->create([
+            'role' => 'client', 'name' => 'Sex Machine', 'email' => 'sm@gmail.com', 'bio' => null,
+        ]);
+
+        $this->actingAs($freelancer)
+            ->postJson(route('users.scan'))
+            ->assertOk()
+            ->assertJsonCount(1, 'flagged')
+            ->assertJsonPath('flagged.0.id', $bad->id)
+            ->assertJsonPath('flagged.0.risk', 'high');
+    }
+
     public function test_scan_flags_non_real_email_domains(): void
     {
         $freelancer = User::factory()->create(['role' => 'freelancer']);

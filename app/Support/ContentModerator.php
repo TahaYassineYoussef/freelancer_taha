@@ -28,6 +28,19 @@ class ContentModerator
     ];
 
     /**
+     * Sexual / adult-content terms. Blocked in identity fields like a display
+     * name (via CleanText strict mode) where they are never legitimate — NOT in
+     * general task text, where a project could reasonably mention them. Matched
+     * on whole words only, so "Essex", "analytics", "Cumming" are safe.
+     */
+    private const ADULT = [
+        'sex', 'sexy', 'porn', 'porno', 'pornstar', 'xxx', 'nude', 'nudes', 'naked',
+        'escort', 'milf', 'horny', 'onlyfans', 'camgirl', 'fetish', 'bdsm', 'boobs',
+        'tits', 'pussy', 'penis', 'vagina', 'orgasm', 'blowjob', 'handjob', 'anal',
+        'cumshot', 'slutty', 'nsfw', 'hentai', 'hooker', 'sexmachine',
+    ];
+
+    /**
      * Signals commonly used by scammers / spam.
      */
     private const SCAM_PATTERNS = [
@@ -53,6 +66,28 @@ class ContentModerator
         $normalised = self::normalise($text);
 
         foreach (self::PROFANITY as $word) {
+            $pattern = '/(?<![a-z])'.preg_quote(self::normalise($word), '/').'(?![a-z])/i';
+            if (preg_match($pattern, $normalised)) {
+                return $word;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the first adult/sexual term found, or null when clean. Whole-word
+     * match, so ordinary names and words containing these as substrings are safe.
+     */
+    public static function findAdult(?string $text): ?string
+    {
+        if (blank($text)) {
+            return null;
+        }
+
+        $normalised = self::normalise($text);
+
+        foreach (self::ADULT as $word) {
             $pattern = '/(?<![a-z])'.preg_quote(self::normalise($word), '/').'(?![a-z])/i';
             if (preg_match($pattern, $normalised)) {
                 return $word;

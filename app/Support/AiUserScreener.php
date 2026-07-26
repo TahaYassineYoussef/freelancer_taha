@@ -232,6 +232,12 @@ class AiUserScreener
             return ['risk' => 'high', 'reason' => $reason];
         }
 
+        // Profane or sexual display name (e.g. "sex machine").
+        $name = (string) ($u['name'] ?? '');
+        if (ContentModerator::findProfanity($name) || ContentModerator::findAdult($name)) {
+            return ['risk' => 'high', 'reason' => 'Inappropriate display name.'];
+        }
+
         // Strong signals — almost certainly adult spam / scam.
         $strong = [
             'onlyfans' => 'Mentions OnlyFans',

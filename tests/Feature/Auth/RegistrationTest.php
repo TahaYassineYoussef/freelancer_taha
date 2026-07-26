@@ -29,6 +29,21 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    public function test_registration_rejects_inappropriate_names(): void
+    {
+        foreach (['sex machine', 'Porn Star', 'xxx'] as $name) {
+            $response = $this->post('/register', [
+                'name' => $name,
+                'email' => 'valid.person@gmail.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+            $response->assertSessionHasErrors('name');
+            $this->assertGuest();
+        }
+    }
+
     public function test_registration_rejects_temporary_and_non_real_emails(): void
     {
         foreach (['spammer@mailinator.com', 'client@freelancer.test', 'someone@example.com'] as $email) {

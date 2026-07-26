@@ -24,7 +24,7 @@ use Throwable;
  */
 class CleanText implements ValidationRule
 {
-    public function __construct(private string $context = 'user submitted text')
+    public function __construct(private string $context = 'user submitted text', private bool $strict = false)
     {
     }
 
@@ -38,6 +38,16 @@ class CleanText implements ValidationRule
         if (ContentModerator::findProfanity($value)) {
             $message = 'Please keep it professional — offensive language is not allowed.';
             $this->record($attribute, $value, 'profanity', $message, 'word_list');
+            $fail($message);
+
+            return;
+        }
+
+        // Strict mode (identity fields like display names): also block sexual /
+        // adult-content terms, which are never legitimate in a name.
+        if ($this->strict && ContentModerator::findAdult($value)) {
+            $message = 'Please use a real, appropriate name.';
+            $this->record($attribute, $value, 'adult', $message, 'word_list');
             $fail($message);
 
             return;

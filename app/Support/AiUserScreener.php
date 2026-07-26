@@ -22,6 +22,23 @@ class AiUserScreener
 {
     private const MODEL = 'claude-opus-4-8';
 
+    /**
+     * Common disposable / temporary / throwaway email providers. An account
+     * using one of these almost never belongs to a real client. This is a
+     * representative list, not exhaustive — new throwaway domains appear daily.
+     */
+    private const DISPOSABLE_DOMAINS = [
+        'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'sharklasers.com',
+        '10minutemail.com', '10minutemail.net', 'tempmail.com', 'temp-mail.org',
+        'tempmailo.com', 'tempmail.plus', 'throwawaymail.com', 'yopmail.com', 'yopmail.fr',
+        'trashmail.com', 'getnada.com', 'nada.email', 'dispostable.com', 'maildrop.cc',
+        'mailnesia.com', 'mohmal.com', 'fakeinbox.com', 'spam4.me', 'grr.la', 'emltmp.com',
+        'moakt.com', 'mailcatch.com', 'tempinbox.com', 'mintemail.com', 'mailtemp.net',
+        'inboxkitten.com', 'burnermail.io', 'temp-mail.io', '1secmail.com', '1secmail.net',
+        'discard.email', 'wegwerfmail.de', 'mailexpire.com', 'tmpmail.net', 'emailondeck.com',
+        'anonaddy.me', 'byom.de', 'mail-temp.com', 'tempr.email', 'luxusmail.org',
+    ];
+
     public static function scan(array $users): array
     {
         if (empty($users)) {
@@ -138,9 +155,10 @@ class AiUserScreener
         - Scam: crypto/forex/investment "opportunities", get-rich-quick, advance-fee, gift
           card / wire demands, phishing, credential harvesting.
         - Bot / fake: gibberish or random-character names, name that is an obvious keyword
-          stuffing, email whose local part is long random characters, mass-registration
-          patterns, off-platform contact funnels (Telegram/WhatsApp/Snapchat handles pushed
-          in the bio).
+          stuffing, email whose local part is long random characters, an email on a
+          disposable/temporary/throwaway domain (e.g. mailinator, guerrillamail, tempmail,
+          yopmail, 10minutemail and similar burner services), mass-registration patterns,
+          off-platform contact funnels (Telegram/WhatsApp/Snapchat handles pushed in the bio).
 
         Do NOT flag ordinary clients: a normal human name, a real business or project
         inquiry, a link to the client's own company site, or an empty/plain profile. When
@@ -177,6 +195,14 @@ class AiUserScreener
             ($u['name'] ?? '').' '.($u['email'] ?? '').' '.($u['headline'] ?? '').' '.($u['bio'] ?? '')
         ));
 
+        $email = mb_strtolower(trim((string) ($u['email'] ?? '')));
+        $domain = str_contains($email, '@') ? substr(strrchr($email, '@'), 1) : '';
+
+        // Disposable / temporary / non-real email — a strong bot/fake signal.
+        if ($domain && in_array($domain, self::DISPOSABLE_DOMAINS, true)) {
+            return ['risk' => 'high', 'reason' => "Disposable/temporary email address ({$domain})."];
+        }
+
         // Strong signals — almost certainly adult spam / scam.
         $strong = [
             'onlyfans' => 'Mentions OnlyFans',
@@ -210,10 +236,8 @@ class AiUserScreener
         }
 
         // Bot-ish email: long random-looking local part with many digits.
-        $email = (string) ($u['email'] ?? '');
-        $local = strtok($email, '@');
-        $botEmail = $local && strlen($local) >= 12 && preg_match_all('/\d/', $local) >= 5;
-        if ($botEmail) {
+        $local = $email ? strtok($email, '@') : '';
+        if ($local && strlen($local) >= 12 && preg_match_all('/\d/', $local) >= 5) {
             $hits[] = 'random-looking email';
         }
 

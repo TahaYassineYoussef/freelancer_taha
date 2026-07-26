@@ -155,6 +155,25 @@ class UserManagementTest extends TestCase
             ->assertJsonPath('flagged.0.risk', 'high');
     }
 
+    public function test_scan_flags_disposable_email_accounts(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        User::factory()->create([
+            'role' => 'client', 'name' => 'Real Client', 'email' => 'real.client@gmail.com',
+            'bio' => 'Need a landing page for my shop.',
+        ]);
+        $fake = User::factory()->create([
+            'role' => 'client', 'name' => 'Temp User', 'email' => 'abc@mailinator.com', 'bio' => null,
+        ]);
+
+        $this->actingAs($freelancer)
+            ->postJson(route('users.scan'))
+            ->assertOk()
+            ->assertJsonCount(1, 'flagged')
+            ->assertJsonPath('flagged.0.id', $fake->id)
+            ->assertJsonPath('flagged.0.risk', 'high');
+    }
+
     public function test_search_filters_the_list(): void
     {
         $freelancer = User::factory()->create(['role' => 'freelancer']);

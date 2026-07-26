@@ -157,7 +157,9 @@ class AiUserScreener
         - Bot / fake: gibberish or random-character names, name that is an obvious keyword
           stuffing, email whose local part is long random characters, an email on a
           disposable/temporary/throwaway domain (e.g. mailinator, guerrillamail, tempmail,
-          yopmail, 10minutemail and similar burner services), mass-registration patterns,
+          yopmail, 10minutemail and similar burner services), an email on a reserved or
+          non-real domain (a .test / .example / .invalid / .localhost TLD, or example.com),
+          mass-registration patterns,
           off-platform contact funnels (Telegram/WhatsApp/Snapchat handles pushed in the bio).
 
         Do NOT flag ordinary clients: a normal human name, a real business or project
@@ -201,6 +203,16 @@ class AiUserScreener
         // Disposable / temporary / non-real email — a strong bot/fake signal.
         if ($domain && in_array($domain, self::DISPOSABLE_DOMAINS, true)) {
             return ['risk' => 'high', 'reason' => "Disposable/temporary email address ({$domain})."];
+        }
+
+        // Reserved / non-routable domains that can never hold a real mailbox
+        // (RFC 2606 / 6761): *.test, *.example, *.invalid, *.localhost, *.local,
+        // plus the example.com/net/org documentation domains.
+        if ($domain && (
+            preg_match('/\.(test|example|invalid|localhost|local)$/', $domain)
+            || in_array($domain, ['example.com', 'example.org', 'example.net'], true)
+        )) {
+            return ['risk' => 'high', 'reason' => "Non-real email domain ({$domain})."];
         }
 
         // Strong signals — almost certainly adult spam / scam.

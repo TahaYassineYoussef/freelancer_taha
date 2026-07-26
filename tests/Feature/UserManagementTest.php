@@ -138,11 +138,11 @@ class UserManagementTest extends TestCase
     {
         $freelancer = User::factory()->create(['role' => 'freelancer']);
         User::factory()->create([
-            'role' => 'client', 'name' => 'John Doe', 'email' => 'john@example.com',
+            'role' => 'client', 'name' => 'John Doe', 'email' => 'john@gmail.com',
             'bio' => 'Looking for a web developer to build my bakery site.',
         ]);
         $spam = User::factory()->create([
-            'role' => 'client', 'name' => 'Hot Girl', 'email' => 'x@example.com',
+            'role' => 'client', 'name' => 'Hot Girl', 'email' => 'hotgirl@gmail.com',
             'bio' => 'check out my onlyfans, link in bio',
         ]);
 
@@ -152,6 +152,25 @@ class UserManagementTest extends TestCase
             ->assertJsonPath('via', 'heuristic')
             ->assertJsonCount(1, 'flagged')
             ->assertJsonPath('flagged.0.id', $spam->id)
+            ->assertJsonPath('flagged.0.risk', 'high');
+    }
+
+    public function test_scan_flags_non_real_email_domains(): void
+    {
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        User::factory()->create([
+            'role' => 'client', 'name' => 'Real Client', 'email' => 'real@gmail.com',
+            'bio' => 'Need a portfolio site built.',
+        ]);
+        $fake = User::factory()->create([
+            'role' => 'client', 'name' => 'Client', 'email' => 'client@freelancer.test', 'bio' => null,
+        ]);
+
+        $this->actingAs($freelancer)
+            ->postJson(route('users.scan'))
+            ->assertOk()
+            ->assertJsonCount(1, 'flagged')
+            ->assertJsonPath('flagged.0.id', $fake->id)
             ->assertJsonPath('flagged.0.risk', 'high');
     }
 

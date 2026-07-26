@@ -1,7 +1,7 @@
 import PanelLayout from '@/Layouts/PanelLayout';
 import LineChart from '@/Components/LineChart';
 import { useT } from '@/i18n';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 // Registrations are bucketed by day / month / year on the server.
@@ -74,7 +74,29 @@ function Pagination({ meta }) {
 export default function ManageUsers({ stats, chart, users, filters }) {
     const t = useT();
     const [search, setSearch] = useState(filters.search || '');
+    const [sentIds, setSentIds] = useState(() => new Set());
+    const [sendingId, setSendingId] = useState(null);
+    const [notice, setNotice] = useState(null);
     const firstRun = useRef(true);
+
+    const sendVerification = (u) => {
+        setSendingId(u.id);
+        router.post(route('users.sendVerification', u.id), {}, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page) => {
+                const flash = page.props.flash || {};
+                if (flash.success) {
+                    setSentIds((s) => new Set(s).add(u.id));
+                    setNotice({ type: 'success', text: flash.success });
+                } else if (flash.error) {
+                    setNotice({ type: 'error', text: flash.error });
+                }
+            },
+            onError: () => setNotice({ type: 'error', text: t('Could not send. Try again.') }),
+            onFinish: () => setSendingId(null),
+        });
+    };
 
     // Debounced search → server (keeps the table + pagination in sync).
     useEffect(() => {
@@ -109,6 +131,13 @@ export default function ManageUsers({ stats, chart, users, filters }) {
     return (
         <PanelLayout title="Manage Users">
             <Head title="Manage Users" />
+
+            {notice && (
+                <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm ${notice.type === 'success' ? 'bg-green-500/10 text-green-300' : 'bg-red-500/10 text-red-300'}`}>
+                    <span>{notice.text}</span>
+                    <button onClick={() => setNotice(null)} className="text-gray-400 hover:text-white">✕</button>
+                </div>
+            )}
 
             {/* Headline counts */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -171,12 +200,13 @@ export default function ManageUsers({ stats, chart, users, filters }) {
                                 <th className="px-4 py-3 font-semibold">{t('Role')}</th>
                                 <th className="px-4 py-3 font-semibold">{t('Status')}</th>
                                 <th className="px-4 py-3 font-semibold">{t('Joined')}</th>
+                                <th className="px-4 py-3 font-semibold">{t('Actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {users.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-10 text-center text-gray-500">{t('No users found.')}</td>
+                                    <td colSpan={6} className="px-4 py-10 text-center text-gray-500">{t('No users found.')}</td>
                                 </tr>
                             )}
                             {users.data.map((u) => (
@@ -195,6 +225,21 @@ export default function ManageUsers({ stats, chart, users, filters }) {
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-gray-400" title={u.joined}>{u.joined_human}</td>
+                                    <td className="px-4 py-3">
+                                        {!u.verified && (
+                                            sentIds.has(u.id) ? (
+                                                <span className="text-xs font-semibold text-green-300">✓ {t('Link sent')}</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => sendVerification(u)}
+                                                    disabled={sendingId === u.id}
+                                                    className="whitespace-nowrap rounded-full border border-gold/40 px-3 py-1 text-xs font-semibold text-gold transition hover:bg-gold/10 disabled:opacity-50"
+                                                >
+                                                    {sendingId === u.id ? t('Sending…') : t('Send verification')}
+                                                </button>
+                                            )
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

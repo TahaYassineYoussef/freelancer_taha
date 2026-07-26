@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -17,7 +18,11 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    // The MustVerifyEmail *trait* (not the contract) gives us
+    // sendEmailVerificationNotification() / markEmailAsVerified() so an admin can
+    // send a verification link and users can verify — WITHOUT implementing the
+    // contract, so verification is never force-required on existing accounts.
+    use HasApiTokens, HasFactory, MustVerifyEmail, Notifiable;
 
     /**
      * Get the attributes that should be cast.

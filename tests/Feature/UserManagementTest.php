@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -39,6 +41,46 @@ class UserManagementTest extends TestCase
         $this->actingAs($client)
             ->get(route('users.index'))
             ->assertForbidden();
+    }
+
+    public function test_freelancer_can_send_a_verification_link(): void
+    {
+        Notification::fake();
+        config(['mail.default' => 'smtp']); // pretend a real mailer is configured
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        $client = User::factory()->unverified()->create(['role' => 'client']);
+
+        $this->actingAs($freelancer)
+            ->post(route('users.sendVerification', $client))
+            ->assertRedirect();
+
+        Notification::assertSentTo($client, VerifyEmail::class);
+    }
+
+    public function test_verification_link_is_not_sent_to_already_verified_user(): void
+    {
+        Notification::fake();
+        $freelancer = User::factory()->create(['role' => 'freelancer']);
+        $client = User::factory()->create(['role' => 'client']); // verified by default
+
+        $this->actingAs($freelancer)
+            ->post(route('users.sendVerification', $client))
+            ->assertSessionHas('error');
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_client_cannot_send_verification_links(): void
+    {
+        Notification::fake();
+        $client = User::factory()->create(['role' => 'client']);
+        $target = User::factory()->unverified()->create(['role' => 'client']);
+
+        $this->actingAs($client)
+            ->post(route('users.sendVerification', $target))
+            ->assertForbidden();
+
+        Notification::assertNothingSent();
     }
 
     public function test_search_filters_the_list(): void

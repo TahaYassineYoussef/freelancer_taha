@@ -157,6 +157,8 @@ Route::middleware('auth')->group(function () {
 
         // Registered accounts: stats + searchable, paginated user list
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::post('/users/{user}/send-verification', [UserManagementController::class, 'sendVerification'])
+            ->name('users.sendVerification');
 
         // Filterable board of all tasks
         Route::get('/tasks-board', [TaskBoardController::class, 'index'])->name('tasks.index');

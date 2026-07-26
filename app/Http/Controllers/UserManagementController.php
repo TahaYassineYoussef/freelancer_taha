@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -51,6 +52,32 @@ class UserManagementController extends Controller
             'users' => $users,
             'filters' => $filters,
         ]);
+    }
+
+    /**
+     * Email a verification link to an unverified user (admin action).
+     */
+    public function sendVerification(User $user): RedirectResponse
+    {
+        if ($user->hasVerifiedEmail()) {
+            return back()->with('error', "{$user->name} is already verified.");
+        }
+
+        // Don't pretend to send when there's no real mailer — the default "log"
+        // (and "array") drivers deliver nothing, so warn instead of faking success.
+        if (in_array(config('mail.default'), ['log', 'array'], true)) {
+            return back()->with('error', 'Email sending is not configured yet, so nothing was sent.');
+        }
+
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'Could not send the email — check the mail settings.');
+        }
+
+        return back()->with('success', "Verification link sent to {$user->email}.");
     }
 
     /**

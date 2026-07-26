@@ -135,7 +135,10 @@ class ChatController extends Controller
 
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $attributes['attachment_path'] = $file->store('chat', 'public');
+            // Store on the configured disk: local "public" in dev, "s3"
+            // (Cloudflare R2) in production, since Vercel's filesystem is
+            // read-only and can't persist uploads.
+            $attributes['attachment_path'] = $file->store('chat', config('filesystems.chat_disk'));
             $attributes['attachment_name'] = $file->getClientOriginalName();
             $attributes['attachment_mime'] = $file->getMimeType();
         }

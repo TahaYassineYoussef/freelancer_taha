@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Chat Attachment Disk
+    |--------------------------------------------------------------------------
+    |
+    | Disk used to store (and build URLs for) chat attachments. Local dev uses
+    | the "public" disk; on read-only hosts like Vercel this is set to "s3"
+    | (Cloudflare R2) via the CHAT_DISK env var. Read via config() rather than
+    | env() so it keeps working when the config is cached.
+    |
+    */
+
+    'chat_disk' => env('CHAT_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

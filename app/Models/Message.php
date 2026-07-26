@@ -25,7 +25,7 @@ class Message extends Model
     public function attachmentUrl(): ?string
     {
         return $this->attachment_path
-            ? \Illuminate\Support\Facades\Storage::url($this->attachment_path)
+            ? \Illuminate\Support\Facades\Storage::disk(config('filesystems.chat_disk'))->url($this->attachment_path)
             : null;
     }
 

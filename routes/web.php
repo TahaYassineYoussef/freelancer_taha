@@ -23,6 +23,7 @@ use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TestimonialController;
+use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\VisitorController;
 use Illuminate\Support\Facades\Route;
 
@@ -153,6 +154,9 @@ Route::middleware('auth')->group(function () {
 
         // Website traffic / visitor analytics
         Route::get('/visitors', [VisitorController::class, 'index'])->name('visitors.index');
+
+        // Registered accounts: stats + searchable, paginated user list
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
 
         // Filterable board of all tasks
         Route::get('/tasks-board', [TaskBoardController::class, 'index'])->name('tasks.index');

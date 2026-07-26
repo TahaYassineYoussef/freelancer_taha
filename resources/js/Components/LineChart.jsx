@@ -1,7 +1,7 @@
 import { useT } from '@/i18n';
 import { useMemo, useState } from 'react';
 
-const GRAINS = [
+const DEFAULT_GRAINS = [
     { key: 'daily', label: 'Daily' },
     { key: 'weekly', label: 'Weekly' },
     { key: 'monthly', label: 'Monthly' },
@@ -11,8 +11,17 @@ const W = 640;
 const H = 260;
 const PAD = { top: 20, right: 16, bottom: 28, left: 32 };
 
-export default function LineChart({ title = 'Task Progress', series }) {
-    const [grain, setGrain] = useState('monthly');
+export default function LineChart({
+    title = 'Task Progress',
+    series,
+    grains = DEFAULT_GRAINS,
+    unit = 'tasks',
+    emptyMessage = 'No task activity in this period yet.',
+    defaultGrain = 'monthly',
+}) {
+    const [grain, setGrain] = useState(() =>
+        grains.some((g) => g.key === defaultGrain) ? defaultGrain : grains[0]?.key
+    );
     const [hover, setHover] = useState(null);
     const t = useT();
 
@@ -60,7 +69,7 @@ export default function LineChart({ title = 'Task Progress', series }) {
             <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-white">{t(title)}</h2>
                 <div className="flex rounded-full bg-ink p-1 text-xs">
-                    {GRAINS.map((g) => (
+                    {grains.map((g) => (
                         <button
                             key={g.key}
                             onClick={() => { setGrain(g.key); setHover(null); }}
@@ -114,13 +123,13 @@ export default function LineChart({ title = 'Task Progress', series }) {
                         style={{ left: `${(hover.x / W) * 100}%`, top: `${(hover.y / H) * 100}%` }}
                     >
                         <div className="text-sm font-bold text-gold">{hover.value}</div>
-                        <div className="text-[10px] text-gray-400">{hover.label} · tasks</div>
+                        <div className="text-[10px] text-gray-400">{hover.label} · {t(unit)}</div>
                     </div>
                 )}
             </div>
 
             {maxY === 1 && data.every((d) => d.value === 0) && (
-                <p className="mt-2 text-center text-xs text-gray-500">No task activity in this period yet.</p>
+                <p className="mt-2 text-center text-xs text-gray-500">{t(emptyMessage)}</p>
             )}
         </div>
     );

@@ -84,6 +84,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Privacy & security — change password (both freelancer and clients)
+    Route::get('/privacy', fn () => \Inertia\Inertia::render('Privacy'))->name('privacy');
+
     // Tasks
     Route::post('/tasks', [TaskController::class, 'store'])
         ->middleware('throttle:10,60') // anti-spam: max 10 posted tasks per hour

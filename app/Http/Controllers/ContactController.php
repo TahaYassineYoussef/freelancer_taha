@@ -19,11 +19,22 @@ class ContactController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // --- Bot traps (silent) --------------------------------------------
+        // A real, human submission always: leaves the hidden honeypot empty,
+        // and takes at least a couple of seconds to fill in. Bots trip one of
+        // these. We pretend it worked so the bot moves on and never retries.
+        $tripped = filled($request->input('website'))          // honeypot filled
+            || (int) $request->input('elapsed') < 2500;         // submitted in < 2.5s (or no JS timer at all)
+
+        if ($tripped) {
+            return back()->with('success', 'Thanks for reaching out! Taha will reply to you by email soon.');
+        }
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new \App\Rules\CleanText('a contact message name')],
             'email' => ['required', 'email', 'max:255'],
             'subject' => ['nullable', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:5000'],
+            'body' => ['required', 'string', 'max:5000', new \App\Rules\CleanText('a contact message')],
         ]);
 
         $contact = ContactMessage::create($data);

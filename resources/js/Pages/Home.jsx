@@ -2,7 +2,7 @@ import Photo from '@/Components/Photo';
 import LanguageSwitcher from '@/Components/LanguageSwitcher';
 import { useApplyDirection, useT } from '@/i18n';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const PHOTO = ['/images/taha.png', '/images/taha.jpg'];
 
@@ -803,15 +803,20 @@ function Testimonials({ testimonials, user }) {
 
 function ContactForm() {
     const t = useT();
-    const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
+    const { data, setData, post, processing, errors, reset, transform, wasSuccessful } = useForm({
         name: '',
         email: '',
         subject: '',
         body: '',
+        website: '', // honeypot — must stay empty; only bots fill hidden fields
     });
+
+    // When the form first mounted, so the server can reject instant (bot) submits.
+    const startedAt = useRef(Date.now());
 
     const submit = (e) => {
         e.preventDefault();
+        transform((d) => ({ ...d, elapsed: Date.now() - startedAt.current }));
         post(route('contact.store'), { preserveScroll: true, onSuccess: () => reset() });
     };
 
@@ -827,6 +832,20 @@ function ContactForm() {
             )}
 
             <form onSubmit={submit} className="space-y-4">
+                {/* Honeypot: hidden from humans, irresistible to bots. Real users
+                    never see or fill it, so any value here means a bot. */}
+                <div className="hidden" aria-hidden="true">
+                    <label>Website</label>
+                    <input
+                        type="text"
+                        name="website"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={data.website}
+                        onChange={(e) => setData('website', e.target.value)}
+                    />
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Field label={t('Your name')} error={errors.name}>
                         <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} className={inputCls} />

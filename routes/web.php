@@ -71,7 +71,7 @@ Route::post('/locale/{locale}', [\App\Http\Controllers\LocaleController::class, 
 // Public: download Taha's CV as PDF + guest contact form
 Route::get('/cv/download', [CvPdfController::class, 'download'])->name('cv.download');
 Route::post('/contact', [ContactController::class, 'store'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:3,10') // max 3 messages per 10 min per IP (was 5/min)
     ->name('contact.store');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])

@@ -62,7 +62,9 @@ export const AuthInput = forwardRef(function AuthInput({ icon, error, ...props }
                 <input
                     ref={ref}
                     {...props}
-                    className="w-full rounded-full border-0 bg-indigo-50 py-3 pl-12 pr-4 text-sm text-gray-700 placeholder-violet-400 focus:bg-indigo-50 focus:ring-2 focus:ring-violet-400"
+                    className={`w-full rounded-full border-0 bg-indigo-50 py-3 pl-12 pr-4 text-sm text-gray-700 placeholder-violet-400 focus:bg-indigo-50 focus:ring-2 ${
+                        error ? 'ring-2 ring-red-400 focus:ring-red-400' : 'focus:ring-violet-400'
+                    }`}
                 />
             </div>
             {error && <p className="mt-1.5 pl-4 text-sm text-red-500">{error}</p>}

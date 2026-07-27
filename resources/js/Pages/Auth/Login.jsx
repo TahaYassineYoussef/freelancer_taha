@@ -1,6 +1,7 @@
 import AuthLayout, { AuthButton, AuthInput, Icons } from '@/Layouts/AuthLayout';
+import { emailError } from '@/validateEmail';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export default function Login({ status, canResetPassword }) {
     const { googleEnabled } = usePage().props;
@@ -16,8 +17,19 @@ export default function Login({ status, canResetPassword }) {
     const emailRef = useRef(null);
     const passwordRef = useRef(null);
 
+    // Live "fake / invalid email" hint, shown once the field is touched.
+    const [emailTouched, setEmailTouched] = useState(false);
+    const liveEmailError = emailTouched ? emailError(data.email) : '';
+
     const submit = (e) => {
         e.preventDefault();
+
+        const typedEmail = emailRef.current?.value || data.email;
+        if (emailError(typedEmail)) {
+            setData('email', typedEmail);
+            setEmailTouched(true);
+            return;
+        }
 
         transform((d) => ({
             ...d,
@@ -68,7 +80,7 @@ export default function Login({ status, canResetPassword }) {
                 <AuthInput
                     ref={emailRef}
                     icon={Icons.user}
-                    error={errors.email}
+                    error={errors.email || liveEmailError}
                     id="email"
                     type="email"
                     name="email"
@@ -77,6 +89,7 @@ export default function Login({ status, canResetPassword }) {
                     autoFocus
                     placeholder="Email"
                     onChange={(e) => setData('email', e.target.value)}
+                    onBlur={() => setEmailTouched(true)}
                 />
 
                 <AuthInput

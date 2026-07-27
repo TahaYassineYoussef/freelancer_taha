@@ -1,5 +1,7 @@
 import AuthLayout, { AuthButton, AuthInput, Icons } from '@/Layouts/AuthLayout';
+import { emailError } from '@/validateEmail';
 import { Link, useForm, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 export default function Register() {
     const { googleEnabled } = usePage().props;
@@ -10,8 +12,17 @@ export default function Register() {
         password_confirmation: '',
     });
 
+    // Live "fake email" detection: show the hint once the field is touched.
+    const [emailTouched, setEmailTouched] = useState(false);
+    const liveEmailError = emailTouched ? emailError(data.email) : '';
+
     const submit = (e) => {
         e.preventDefault();
+        // Block obviously fake/invalid emails before the round-trip.
+        if (emailError(data.email)) {
+            setEmailTouched(true);
+            return;
+        }
         post(route('register'), {
             onFinish: () => reset('password', 'password_confirmation'),
         });
@@ -63,14 +74,15 @@ export default function Register() {
 
                 <AuthInput
                     icon={Icons.mail}
-                    error={errors.email}
+                    error={errors.email || liveEmailError}
                     id="email"
                     type="email"
                     name="email"
                     value={data.email}
                     autoComplete="username"
                     placeholder="Email"
-                    onChange={(e) => setData('email', e.target.value)}
+                    onChange={(e) => { setData('email', e.target.value); if (emailTouched) setEmailTouched(true); }}
+                    onBlur={() => setEmailTouched(true)}
                 />
 
                 <AuthInput

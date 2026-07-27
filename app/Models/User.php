@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,13 +15,12 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'password', 'google_id', 'role', 'headline', 'headline_fr', 'headline_ar', 'bio', 'bio_fr', 'bio_ar', 'location', 'phone', 'avatar', 'd17_number', 'd17_qr', 'd17_enabled', 'paypal_email', 'paypal_client_id', 'paypal_enabled'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    // The MustVerifyEmail *trait* (not the contract) gives us
-    // sendEmailVerificationNotification() / markEmailAsVerified() so an admin can
-    // send a verification link and users can verify — WITHOUT implementing the
-    // contract, so verification is never force-required on existing accounts.
+    // Implements the MustVerifyEmail *contract* (so the `verified` middleware
+    // enforces email confirmation before the dashboard, and registration
+    // auto-sends the link) plus the matching *trait* for its behaviour.
     use HasApiTokens, HasFactory, MustVerifyEmail, Notifiable;
 
     /**

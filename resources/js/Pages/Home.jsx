@@ -803,6 +803,7 @@ function Testimonials({ testimonials, user }) {
 
 function ContactForm() {
     const t = useT();
+    const { turnstileSiteKey } = usePage().props;
     const { data, setData, post, processing, errors, reset, transform, wasSuccessful } = useForm({
         name: '',
         email: '',
@@ -814,10 +815,45 @@ function ContactForm() {
     // When the form first mounted, so the server can reject instant (bot) submits.
     const startedAt = useRef(Date.now());
 
+    // Cloudflare Turnstile: render the invisible widget and keep its token.
+    const widgetBox = useRef(null);
+    const widgetId = useRef(null);
+    const token = useRef('');
+
+    useEffect(() => {
+        if (!turnstileSiteKey) return undefined;
+        const render = () => {
+            if (window.turnstile && widgetBox.current && widgetId.current === null) {
+                widgetId.current = window.turnstile.render(widgetBox.current, {
+                    sitekey: turnstileSiteKey,
+                    callback: (tok) => { token.current = tok; },
+                    'error-callback': () => { token.current = ''; },
+                    'expired-callback': () => { token.current = ''; },
+                });
+            }
+        };
+        if (window.turnstile) render();
+        const iv = setInterval(() => { if (window.turnstile) { clearInterval(iv); render(); } }, 200);
+        return () => {
+            clearInterval(iv);
+            if (widgetId.current !== null && window.turnstile) {
+                try { window.turnstile.remove(widgetId.current); } catch { /* noop */ }
+                widgetId.current = null;
+            }
+        };
+    }, [turnstileSiteKey]);
+
     const submit = (e) => {
         e.preventDefault();
-        transform((d) => ({ ...d, elapsed: Date.now() - startedAt.current }));
-        post(route('contact.store'), { preserveScroll: true, onSuccess: () => reset() });
+        transform((d) => ({ ...d, elapsed: Date.now() - startedAt.current, 'cf-turnstile-response': token.current }));
+        post(route('contact.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                token.current = '';
+                if (widgetId.current !== null && window.turnstile) window.turnstile.reset(widgetId.current);
+            },
+        });
     };
 
     return (
@@ -860,6 +896,8 @@ function ContactForm() {
                 <Field label={t('Message')} error={errors.body}>
                     <textarea rows={4} value={data.body} onChange={(e) => setData('body', e.target.value)} className={inputCls} />
                 </Field>
+                {turnstileSiteKey && <div ref={widgetBox} />}
+                {errors.captcha && <p className="text-sm text-red-400">{errors.captcha}</p>}
                 <button type="submit" disabled={processing} className="rounded-full bg-gold px-8 py-2.5 text-sm font-bold uppercase text-ink transition hover:bg-gold-300 disabled:opacity-60">
                     {processing ? t('Sending…') : t('Send message')}
                 </button>

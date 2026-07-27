@@ -30,6 +30,15 @@ class ContactController extends Controller
             return back()->with('success', 'Thanks for reaching out! Taha will reply to you by email soon.');
         }
 
+        // --- Cloudflare Turnstile (only when configured) --------------------
+        // A visible error here (unlike the silent traps above) so a real person
+        // whose check hiccuped knows to retry; bots simply have no valid token.
+        if (config('services.turnstile.secret_key') && ! $this->turnstilePassed($request)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'captcha' => 'Verification failed. Please try again.',
+            ]);
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', new \App\Rules\CleanText('a contact message name')],
             'email' => ['required', 'email', 'max:255'],
@@ -48,6 +57,35 @@ class ContactController extends Controller
         ));
 
         return back()->with('success', 'Thanks for reaching out! Taha will reply to you by email soon.');
+    }
+
+    /**
+     * Verify the Cloudflare Turnstile token with the siteverify endpoint.
+     * Fails open on a network error so a Cloudflare outage never blocks real
+     * clients (the honeypot + timing + rate limit still stand).
+     */
+    private function turnstilePassed(Request $request): bool
+    {
+        $token = $request->input('cf-turnstile-response');
+        if (blank($token)) {
+            return false;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::asForm()
+                ->timeout(8)
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret' => config('services.turnstile.secret_key'),
+                    'response' => $token,
+                    'remoteip' => $request->ip(),
+                ]);
+
+            return (bool) $response->json('success');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return true; // fail open
+        }
     }
 
     /**

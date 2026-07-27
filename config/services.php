@@ -26,6 +26,13 @@ return [
         'anon_key' => env('SUPABASE_ANON_KEY'),
     ],
 
+    // Cloudflare Turnstile — invisible bot check on the public contact form.
+    // site_key is public (front-end widget); secret_key verifies server-side.
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

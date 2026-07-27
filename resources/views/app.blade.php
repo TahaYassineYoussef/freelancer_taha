@@ -41,6 +41,11 @@
             </script>
         @endif
 
+        {{-- Cloudflare Turnstile (bot protection) — only when configured --}}
+        @if (config('services.turnstile.site_key'))
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        @endif
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />

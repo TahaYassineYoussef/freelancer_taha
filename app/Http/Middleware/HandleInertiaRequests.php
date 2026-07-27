@@ -71,6 +71,8 @@ class HandleInertiaRequests extends Middleware
                 // Falls back to the .env switch when no account exists yet.
                 'enabled' => (bool) ($this->freelancer()?->paypal_enabled ?? config('services.paypal.enabled')),
             ],
+            // Public Turnstile site key for the contact-form widget (null = off).
+            'turnstileSiteKey' => config('services.turnstile.site_key'),
             'd17' => fn () => $this->d17Details(),
             // Public Supabase Realtime config for instant call signalling. Only
             // shared to signed-in users (guests never place calls).

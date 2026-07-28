@@ -26,12 +26,25 @@ function photoSources(freelancer) {
 function fmtDate(value) {
     if (!value) return null;
     const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
     return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+// Diplomas store a plain year integer (2023); experiences/internships store a
+// full date. Show a bare year as-is, and a real date as "Mon YYYY" — never run
+// a year through new Date() (new Date(2023) is 2023ms after 1970 → "Jan 1970").
+function fmtPoint(value) {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    if (Number.isInteger(n) && n >= 1900 && n <= 2100 && String(value).trim().length <= 4) {
+        return String(n);
+    }
+    return fmtDate(value);
+}
+
 function range(start, end, current) {
-    const from = fmtDate(start) ?? (typeof start === 'number' ? start : null);
-    const to = current ? 'Present' : (fmtDate(end) ?? (typeof end === 'number' ? end : null));
+    const from = fmtPoint(start);
+    const to = current ? 'Present' : fmtPoint(end);
     if (!from && !to) return '';
     return [from, to].filter(Boolean).join(' — ');
 }
